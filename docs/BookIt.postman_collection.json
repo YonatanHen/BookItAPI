@@ -255,6 +255,225 @@
       ]
     },
     {
+      "name": "Businesses",
+      "item": [
+        {
+          "name": "List businesses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Page shape', () => { pm.expect(body).to.include.all.keys('count', 'limit', 'offset', 'next', 'previous', 'results'); pm.expect(body.limit).to.eql(20); pm.expect(body.offset).to.eql(0); pm.expect(body.previous).to.eql(null); pm.expect(body.results).to.be.an('array'); });",
+                  "pm.test('Item shape', () => body.results.forEach(b => { pm.expect(b).to.include.all.keys('id', 'name', 'category', 'owner_id', 'owner_name', 'services'); b.services.forEach(s => pm.expect(s).to.include.all.keys('id', 'name', 'duration_minutes', 'price')); }));",
+                  "if (body.results.length) {",
+                  "  pm.collectionVariables.set('businessId', body.results[0].id);",
+                  "  const withService = body.results.find(b => b.services.length);",
+                  "  if (withService) pm.collectionVariables.set('serviceId', withService.services[0].id);",
+                  "  const ownerId = Number(pm.collectionVariables.get('ownerId'));",
+                  "  const own = body.results.find(b => b.owner_id === ownerId);",
+                  "  const other = body.results.find(b => b.owner_id !== ownerId);",
+                  "  if (own) pm.collectionVariables.set('ownerBusinessId', own.id);",
+                  "  if (other) pm.collectionVariables.set('otherBusinessId', other.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/businesses?limit=100",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses"],
+              "query": [
+                { "key": "category", "value": "Barber", "disabled": true, "description": "Optional. Barber, Beauty, Fitness, Massage, Physiotherapy or Tutoring (any case)." },
+                { "key": "search", "value": "cut", "disabled": true, "description": "Optional. Name substring, any case, max 200 chars." },
+                { "key": "order", "value": "asc", "disabled": true, "description": "Optional. Sort by name: asc (default) or desc." },
+                { "key": "limit", "value": "100", "description": "Optional. 1-100, default 20." },
+                { "key": "offset", "value": "0", "disabled": true, "description": "Optional. >= 0, default 0." }
+              ]
+            },
+            "description": "JWT required (bearer {{accessToken}}). Run 'Login as client' and 'Login as owner' first. Query: category (optional, BusinessCategory, any case), search (optional, name substring, any case, max 200), order (optional, asc|desc, default asc, by name), limit (optional, 1-100, default 20), offset (optional, >= 0, default 0). Response 200: {count, limit, offset, next, previous, results: [{id, name, category, owner_id, owner_name, services: [{id, name, duration_minutes, price}]}]}. Saves businessId, serviceId, ownerBusinessId (owner_id == ownerId) and otherBusinessId. Errors: 400 invalid query (problem+json with errors[{field, message}]), 401 missing or invalid token."
+          }
+        },
+        {
+          "name": "List businesses by category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All results are Barber', () => pm.response.json().results.forEach(b => pm.expect(b.category).to.eql('Barber')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/businesses?category=barber",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses"],
+              "query": [{ "key": "category", "value": "barber", "description": "Case-insensitive BusinessCategory value." }]
+            },
+            "description": "Filters by category (lowercase 'barber' shows case-insensitive matching). Responses: 200, 400 unknown category, 401."
+          }
+        },
+        {
+          "name": "Search businesses by name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const term = pm.request.url.query.get('search').trim().toLowerCase();",
+                  "pm.test('All names contain the search term', () => pm.response.json().results.forEach(b => pm.expect(b.name.toLowerCase()).to.include(term)));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/businesses?search=CUT",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses"],
+              "query": [{ "key": "search", "value": "CUT", "description": "Case-insensitive name substring, max 200 chars." }]
+            },
+            "description": "Name search, case-insensitive. Responses: 200, 400 search too long, 401."
+          }
+        },
+        {
+          "name": "List businesses descending",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const names = pm.response.json().results.map(b => b.name);",
+                  "pm.test('Names are in descending order', () => { for (let i = 1; i < names.length; i++) pm.expect(names[i - 1].localeCompare(names[i])).to.be.at.least(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/businesses?order=desc&limit=100",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses"],
+              "query": [
+                { "key": "order", "value": "desc", "description": "asc (default) or desc, by name." },
+                { "key": "limit", "value": "100", "description": "1-100, default 20." }
+              ]
+            },
+            "description": "Sorted by name, descending. Responses: 200, 400 invalid order, 401."
+          }
+        },
+        {
+          "name": "List businesses paginated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Echoes limit and offset', () => { pm.expect(body.limit).to.eql(2); pm.expect(body.offset).to.eql(1); });",
+                  "pm.test('At most 2 results', () => pm.expect(body.results.length).to.be.at.most(2));",
+                  "pm.test('previous link is set', () => pm.expect(body.previous).to.include('offset=0'));",
+                  "pm.test('next link matches count', () => { if (body.count > 3) pm.expect(body.next).to.include('offset=3'); else pm.expect(body.next).to.eql(null); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/businesses?limit=2&offset=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses"],
+              "query": [
+                { "key": "limit", "value": "2", "description": "1-100, default 20." },
+                { "key": "offset", "value": "1", "description": ">= 0, default 0." }
+              ]
+            },
+            "description": "Second page window: limit=2, offset=1. next/previous are absolute URLs or null. Responses: 200, 400 invalid limit/offset, 401."
+          }
+        },
+        {
+          "name": "List businesses with limit 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));",
+                  "pm.test('Error on limit', () => pm.expect(pm.response.json().errors.map(e => e.field)).to.include('limit'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/businesses?limit=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses"],
+              "query": [{ "key": "limit", "value": "0", "description": "Invalid: must be 1-100." }]
+            },
+            "description": "limit below 1. Expected 400 problem+json with errors[{field: limit, message}]."
+          }
+        },
+        {
+          "name": "List businesses with unknown category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));",
+                  "pm.test('Error on category', () => pm.expect(pm.response.json().errors.map(e => e.field)).to.include('category'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/businesses?category=Cooking",
+              "host": ["{{baseUrl}}"],
+              "path": ["businesses"],
+              "query": [{ "key": "category", "value": "Cooking", "description": "Invalid: not a BusinessCategory." }]
+            },
+            "description": "Unknown category. Expected 400 problem+json with errors[{field: category, message}]."
+          }
+        }
+      ]
+    },
+    {
       "name": "API",
       "item": [
         {
@@ -302,6 +521,28 @@
             "method": "GET",
             "header": [],
             "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] },
+            "description": "No Authorization header. Expected 401 problem+json."
+          }
+        },
+        {
+          "name": "List businesses without token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/businesses", "host": ["{{baseUrl}}"], "path": ["businesses"] },
             "description": "No Authorization header. Expected 401 problem+json."
           }
         },

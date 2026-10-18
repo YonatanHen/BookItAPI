@@ -94,7 +94,7 @@ All foreign keys use `CASCADE`. The ERD is in `docs/erd.md`.
 | POST | `/api/v1/auth/login` | public | 200 `{access, refresh, token_type}` | 400 validation, 401 bad credentials, 429 throttled (bonus) |
 | POST | `/api/v1/auth/refresh` | public (refresh token in body) | 200 `{access}` | 400 missing field, 401 invalid/expired refresh |
 | GET | `/api/v1/` | JWT | 200 `{version}` | 401 |
-| GET | `/api/v1/businesses?category=&search=&limit=&offset=` | JWT | 200 page | 400 bad limit/offset or unknown category, 401 |
+| GET | `/api/v1/businesses?category=&search=&order=&limit=&offset=` | JWT | 200 page | 400 bad limit/offset, unknown category or order, 401 |
 | POST | `/api/v1/appointments` | JWT (Client) | 201 appointment | 400 validation / past time / unknown service, 401, 403 not a client, 409 slot taken or duplicate booking request |
 | GET | `/api/v1/appointments?from=&to=&status=&limit=&offset=` | JWT | 200 page | 400 bad filter, 401 |
 | GET | `/api/v1/businesses/{id}/summary` | JWT (owner of that business) | 200 summary | 401, 403 not owner, 404 no such business |
@@ -140,7 +140,7 @@ Unknown version (for example `/api/v2/...`) → 404.
 
 ### Businesses list
 - `category` must be a `BusinessCategory` name, matched case-insensitively (`barber` = `Barber`). An unknown category → 400 that lists the allowed values. `search` is a case-insensitive substring match on `name`.
-- Ordered by `(name, id)`.
+- `order` is `asc` (default) or `desc`, case-insensitive, and sorts by `name`; `id` breaks ties in the same direction. Any other value → 400.
 - Each item contains `id`, `name`, `category`, `owner_id`, `owner_name`, and `services` (`id`, `name`, `duration_minutes`, `price`). Clients need the service ids to book.
 - Queries: `select_related("owner")` + `prefetch_related("services")`. The query count is constant.
 
