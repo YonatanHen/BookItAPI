@@ -18,7 +18,7 @@ def make_user(
 ) -> User:
     """Create a user with a unique email."""
     return User.objects.create_user(
-        email=email or f"user{next(_sequence)}@example.com",
+        email=email or f"user{next(_sequence)}@bookit-test.io",
         password=password,
         full_name=full_name,
         role=role,

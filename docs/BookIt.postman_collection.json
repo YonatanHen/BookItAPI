@@ -1,0 +1,333 @@
+{
+  "info": {
+    "name": "BookIt API",
+    "description": "BookIt REST API v1. Errors are RFC 9457 application/problem+json. Times are unix timestamps in seconds.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "host", "value": "http://localhost:8000" },
+    { "key": "baseUrl", "value": "{{host}}/api/v1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "ownerAccessToken", "value": "" },
+    { "key": "ownerId", "value": "" },
+    { "key": "businessId", "value": "" },
+    { "key": "ownerBusinessId", "value": "" },
+    { "key": "otherBusinessId", "value": "" },
+    { "key": "serviceId", "value": "" },
+    { "key": "bookingStartTime", "value": "" },
+    { "key": "seedPassword", "value": "BookIt123!" },
+    { "key": "runEmail", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register client",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('runEmail', 'client_' + Date.now() + '@bookit.dev');"] }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Role is Client', () => pm.expect(pm.response.json().role).to.eql('Client'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{seedPassword}}\",\n  \"full_name\": \"Test Client\",\n  \"role\": \"Client\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Public. Body: email (required, valid email), password (required, 1-128 chars, must pass Django password validators), full_name (required, 1-150 chars, not blank), role (required: Client or BusinessOwner). Extra fields are rejected. Email is unique per run via a pre-request script. Responses: 201 (id, email, full_name, role), 400 invalid body, 409 email already registered."
+          }
+        },
+        {
+          "name": "Register owner",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('ownerEmail', 'owner_' + Date.now() + '@bookit.dev');"] }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Role is BusinessOwner', () => pm.expect(pm.response.json().role).to.eql('BusinessOwner'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{ownerEmail}}\",\n  \"password\": \"{{seedPassword}}\",\n  \"full_name\": \"Test Owner\",\n  \"role\": \"BusinessOwner\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Public. Same body as 'Register client' with role BusinessOwner. Email is unique per run via a pre-request script. Responses: 201, 400 invalid body, 409 email already registered."
+          }
+        },
+        {
+          "name": "Login as client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has tokens', () => { pm.expect(body.access).to.be.a('string'); pm.expect(body.refresh).to.be.a('string'); pm.expect(body.token_type).to.eql('Bearer'); });",
+                  "pm.collectionVariables.set('accessToken', body.access);",
+                  "pm.collectionVariables.set('refreshToken', body.refresh);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"client1@bookit.dev\",\n  \"password\": \"{{seedPassword}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Public. Body: email (required, valid email), password (required, 1-128 chars). Uses seed user client1@bookit.dev. Saves accessToken and refreshToken. Responses: 200 (access, refresh, token_type=Bearer), 400 invalid body, 401 wrong credentials."
+          }
+        },
+        {
+          "name": "Login as owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('ownerAccessToken', body.access);",
+                  "const b64 = body.access.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');",
+                  "const payload = JSON.parse(atob(b64));",
+                  "pm.collectionVariables.set('ownerId', payload.user_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner1@bookit.dev\",\n  \"password\": \"{{seedPassword}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Public. Same body as 'Login as client', with seed user owner1@bookit.dev. Saves ownerAccessToken and ownerId (user_id claim of the JWT). Responses: 200, 400, 401."
+          }
+        },
+        {
+          "name": "Refresh access token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Has new access token', () => { pm.expect(body.access).to.be.a('string'); pm.expect(body.token_type).to.eql('Bearer'); });",
+                  "pm.collectionVariables.set('accessToken', body.access);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/refresh", "host": ["{{baseUrl}}"], "path": ["auth", "refresh"] },
+            "description": "Public. Body: refresh (required, non-empty string, the refresh token from login). Run 'Login as client' first. Saves the new accessToken. Responses: 200 (access, token_type=Bearer), 400 invalid body, 401 invalid or expired refresh token."
+          }
+        },
+        {
+          "name": "Login with wrong password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"client1@bookit.dev\",\n  \"password\": \"WrongPassword!1\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "description": "Valid body with a wrong password. Expected 401 problem+json."
+          }
+        },
+        {
+          "name": "Register invalid body",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"\",\n  \"full_name\": \"   \",\n  \"role\": \"Admin\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Invalid email, empty password, blank full_name and unknown role. Expected 400 problem+json."
+          }
+        },
+        {
+          "name": "Register duplicate email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"client1@bookit.dev\",\n  \"password\": \"{{seedPassword}}\",\n  \"full_name\": \"Duplicate Client\",\n  \"role\": \"Client\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "description": "Registers the already-existing seed email client1@bookit.dev. Expected 409 problem+json."
+          }
+        }
+      ]
+    },
+    {
+      "name": "API",
+      "item": [
+        {
+          "name": "API root",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Version is v1', () => pm.expect(pm.response.json().version).to.eql('v1'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] },
+            "description": "JWT required (bearer {{accessToken}}). Run 'Login as client' first. Responses: 200 {\"version\": \"v1\"}, 401 missing or invalid token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Errors",
+      "item": [
+        {
+          "name": "API root without token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] },
+            "description": "No Authorization header. Expected 401 problem+json."
+          }
+        },
+        {
+          "name": "Unknown API version",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{host}}/api/v2/", "host": ["{{host}}"], "path": ["api", "v2", ""] },
+            "description": "Version v2 does not exist. Expected 404 problem+json."
+          }
+        }
+      ]
+    }
+  ]
+}

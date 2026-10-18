@@ -2,6 +2,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from bookit.models import UserRole
+from bookit.services.auth_service import AuthService
 from tests.factories import make_user
 
 
@@ -23,3 +24,13 @@ def owner_user(db):
 @pytest.fixture
 def api_client():
     return APIClient()
+
+
+@pytest.fixture
+def auth_client():
+    def _make(user):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {AuthService().issue_tokens(user).access}")
+        return client
+
+    return _make
