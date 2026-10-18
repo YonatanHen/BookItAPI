@@ -1,4 +1,5 @@
 import pytest
+from rest_framework.test import APIClient
 
 from bookit.models import UserRole
 from tests.factories import make_user
@@ -17,3 +18,8 @@ def client_user(db):
 @pytest.fixture
 def owner_user(db):
     return make_user(role=UserRole.BUSINESS_OWNER, full_name="Oscar Owner")
+
+
+@pytest.fixture
+def api_client():
+    return APIClient()
