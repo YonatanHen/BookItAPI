@@ -1,0 +1,12 @@
+.remember/
+.claude/settings.local.json
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+staticfiles/
+.idea/
+.vscode/
+DECISIONS.md
+.superpowers/
