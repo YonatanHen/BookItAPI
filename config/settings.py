@@ -36,6 +36,9 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 MIDDLEWARE = [
+    "bookit.middleware.correlation.CorrelationIdMiddleware",
+    "bookit.middleware.request_logging.RequestLoggingMiddleware",
+    "bookit.middleware.exception_handling.ExceptionHandlingMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
@@ -73,6 +76,7 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "EXCEPTION_HANDLER": "bookit.api.common.exception_handler.problem_details_exception_handler",
 }
 
 SIMPLE_JWT = {
@@ -83,4 +87,17 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "SIGNING_KEY": SECRET_KEY,
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"correlation_id": {"()": "bookit.middleware.correlation.CorrelationIdFilter"}},
+    "formatters": {
+        "default": {"format": "%(asctime)s %(levelname)s [%(correlation_id)s] %(name)s: %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "default", "filters": ["correlation_id"]},
+    },
+    "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
 }
