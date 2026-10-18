@@ -14,7 +14,7 @@
 
 ## Workflow
 - TDD: write the failing test first, see it fail, then implement.
-- One feature per branch named `dev/<feature>`, created from `master` and fast-forward merged back.
+- One feature per branch named `dev/<feature>`. Never merge to `master` locally: push the branch, open a GitHub PR in implementation order, and start the next task only after the user approves the PR.
 - After adding or changing an endpoint, view, route or schema under `bookit/api/`, run the `postman-sync` subagent in the background and commit the updated collection with the task.
 - Never push without asking. Never add Claude / Co-Authored-By attribution to commits or PRs.
 - Windows: run Python as `.venv/Scripts/python`; start Postgres with `docker start bookit-db`.
