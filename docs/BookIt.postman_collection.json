@@ -510,7 +510,7 @@
               "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
             },
             "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
-            "description": "JWT required, Client role only (bearer {{accessToken}}). Run 'Login as client' and 'List businesses' first. Body: service_id (required, int > 0), start_time (required, unix seconds, must be in the future). Extra fields are rejected. A pre-request script sets bookingStartTime to a whole hour 1-60 days ahead plus a random hour offset, so reruns do not collide. Response 201: {id, status: Pending, start_time, end_time, service_id, service_name, price, business_id, business_name, client_id, client_name}. Errors: 400 invalid body, past start time or unknown service id, 401 missing or invalid token, 403 caller is a business owner, 409 slot overlaps an active appointment of the same service."
+            "description": "JWT required, Client role only (bearer {{accessToken}}). Run 'Login as client' and 'List businesses' first. Body: service_id (required, int > 0), start_time (required, positive unix seconds, must be in the future). Extra fields are rejected. A pre-request script sets bookingStartTime to a whole hour 1-60 days ahead plus a random hour offset, so reruns do not collide. Response 201: {id, status: Pending, start_time, end_time, service_id, service_name, price, business_id, business_name, client_id, client_name}. Errors: 400 invalid body, past start time or unknown service id, 401 missing or invalid token, 403 caller is a business owner, 409 slot overlaps an active appointment of the same service."
           }
         },
         {
@@ -537,14 +537,14 @@
               "host": ["{{baseUrl}}"],
               "path": ["appointments"],
               "query": [
-                { "key": "from", "value": "{{bookingStartTime}}", "disabled": true, "description": "Optional. Unix seconds, inclusive lower bound on start_time. Must be <= to." },
-                { "key": "to", "value": "{{bookingStartTime}}", "disabled": true, "description": "Optional. Unix seconds, inclusive upper bound on start_time." },
+                { "key": "from", "value": "{{bookingStartTime}}", "disabled": true, "description": "Optional. Positive unix seconds, inclusive lower bound on start_time. Must be <= to." },
+                { "key": "to", "value": "{{bookingStartTime}}", "disabled": true, "description": "Optional. Positive unix seconds, inclusive upper bound on start_time." },
                 { "key": "status", "value": "Pending", "disabled": true, "description": "Optional. Pending, Confirmed or Cancelled (any case)." },
                 { "key": "limit", "value": "20", "description": "Optional. 1-100, default 20." },
                 { "key": "offset", "value": "0", "disabled": true, "description": "Optional. >= 0, default 0." }
               ]
             },
-            "description": "JWT required (bearer {{accessToken}}). A client sees their own appointments; an owner sees appointments of their own businesses (use bearer {{ownerAccessToken}}). Query: from, to (optional, unix seconds, inclusive, from <= to), status (optional, Pending|Confirmed|Cancelled, any case), limit (optional, 1-100, default 20), offset (optional, >= 0, default 0). Response 200: {count, limit, offset, next, previous, results: [appointment]}. Errors: 400 invalid query (problem+json with errors[{field, message}]), 401 missing or invalid token."
+            "description": "JWT required (bearer {{accessToken}}). A client sees their own appointments; an owner sees appointments of their own businesses (use bearer {{ownerAccessToken}}). Query: from, to (optional, positive unix seconds, inclusive, from <= to), status (optional, Pending|Confirmed|Cancelled, any case), limit (optional, 1-100, default 20), offset (optional, >= 0, default 0). Response 200: {count, limit, offset, next, previous, results: [appointment]}. Errors: 400 invalid query (problem+json with errors[{field, message}]), 401 missing or invalid token."
           }
         },
         {
@@ -576,8 +576,8 @@
               "host": ["{{baseUrl}}"],
               "path": ["appointments"],
               "query": [
-                { "key": "from", "value": "{{rangeFrom}}", "description": "Inclusive unix seconds on start_time, one hour before bookingStartTime." },
-                { "key": "to", "value": "{{rangeTo}}", "description": "Inclusive unix seconds on start_time, one hour after bookingStartTime." },
+                { "key": "from", "value": "{{rangeFrom}}", "description": "Inclusive positive unix seconds on start_time, one hour before bookingStartTime." },
+                { "key": "to", "value": "{{rangeTo}}", "description": "Inclusive positive unix seconds on start_time, one hour after bookingStartTime." },
                 { "key": "status", "value": "pending", "description": "Case-insensitive status." }
               ]
             },
@@ -607,6 +607,32 @@
             },
             "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
             "description": "start_time is 2000-01-01 (past). Expected 400 problem+json."
+          }
+        },
+        {
+          "name": "Book appointment with non-positive start_time",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));",
+                  "pm.test('errors[].field includes start_time', () => pm.expect(pm.response.json().errors.map(e => e.field).join(',')).to.include('start_time'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": 0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "start_time must be positive unix seconds; 0 and negative values are rejected ('unix timestamp must be positive'). Expected 400 problem+json."
           }
         },
         {
@@ -707,7 +733,7 @@
               "raw": "{{baseUrl}}/appointments?from=yesterday",
               "host": ["{{baseUrl}}"],
               "path": ["appointments"],
-              "query": [{ "key": "from", "value": "yesterday", "description": "Invalid: must be unix seconds." }]
+              "query": [{ "key": "from", "value": "yesterday", "description": "Invalid: must be positive unix seconds." }]
             },
             "description": "Non-numeric from. Expected 400 problem+json with errors[{field: from, message}]."
           }

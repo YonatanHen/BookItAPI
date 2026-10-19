@@ -37,8 +37,10 @@ def _to_utc_datetime(value: Any) -> datetime:
         return value
     if isinstance(value, bool) or not isinstance(value, (int, str)):
         raise ValueError(_TIMESTAMP_ERROR)
-    if isinstance(value, str) and not value.strip().lstrip("-").isdigit():
+    if isinstance(value, str) and not value.strip().isdigit():
         raise ValueError(_TIMESTAMP_ERROR)
+    if int(value) <= 0:
+        raise ValueError("unix timestamp must be positive")
     try:
         return datetime.fromtimestamp(int(value), tz=UTC)
     except (OverflowError, OSError, ValueError) as exc:
