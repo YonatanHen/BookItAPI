@@ -307,5 +307,5 @@ Brief requirement 2 (request logging + correlation id header) is covered by `Cor
 - Done as part of the core: refresh token, pytest tests for the service classes, docker-compose, request validation with Pydantic.
 - Login rate limiting (done): `django-ratelimit` on `POST /auth/login` only, keyed by client IP, `LOGIN_RATE_LIMIT` (default `5/m`).
   - `block=True` raises `Ratelimited` (a `PermissionDenied`); the exception handler maps it to 429 Problem Details with `Retry-After` = the window length.
-  - Counters live in the local-memory cache, so each gunicorn worker counts separately. A shared Redis cache is the production fix.
+  - Counters: in Docker, a small `redis` service (in-memory, no persistence) shared by all gunicorn workers, through `REDIS_URL`. Without `REDIS_URL` (local dev, tests) the local-memory cache is used.
 - Out of scope: logout with a token blacklist.

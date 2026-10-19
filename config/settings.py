@@ -91,8 +91,14 @@ SIMPLE_JWT = {
     "SIGNING_KEY": SECRET_KEY,
 }
 
-CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
-# LocMem counts per gunicorn worker; a shared Redis cache is the production fix (see README).
+# Docker sets REDIS_URL so all gunicorn workers share one rate-limit counter; local dev/tests use LocMem.
+REDIS_URL = os.environ.get("REDIS_URL", "")
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}
+    if REDIS_URL
+    else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+}
+# E003: LocMem is per process (fine for one dev process). W001: Django's built-in RedisCache is not on the library's list.
 SILENCED_SYSTEM_CHECKS = ["django_ratelimit.E003", "django_ratelimit.W001"]
 LOGIN_RATE_LIMIT = env("LOGIN_RATE_LIMIT", "5/m")
 
