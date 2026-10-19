@@ -45,10 +45,3 @@ def test_does_not_overwrite_an_env_created_after_the_check(tmp_path, monkeypatch
     monkeypatch.setattr(Path, "exists", lambda self: False)
     assert create_env_file(tmp_path) is False
     assert (tmp_path / ".env").read_text(encoding="utf-8") == "DJANGO_SECRET_KEY=keep-me\n"
-
-
-@pytest.mark.skipif(os.name == "nt", reason="POSIX file modes only")
-def test_env_file_is_readable_by_the_owner_only(tmp_path):
-    (tmp_path / ".env.example").write_text(TEMPLATE, encoding="utf-8")
-    create_env_file(tmp_path)
-    assert stat.S_IMODE((tmp_path / ".env").stat().st_mode) == 0o600

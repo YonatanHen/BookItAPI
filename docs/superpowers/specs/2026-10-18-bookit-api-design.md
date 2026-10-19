@@ -51,7 +51,7 @@ bookit/
   middleware/               correlation.py, request_logging.py, exception_handling.py
   management/commands/      seed.py, purge_idempotency_keys.py
 tests/                      factories.py, conftest.py, test_models/, test_services/, test_api/, test_middleware/
-docs/                       erd.md, architecture.md, BookIt.postman_collection.json, superpowers/
+docs/                       BookIt.postman_collection.json, superpowers/ (diagrams live in README.md)
 ```
 
 ## 4. Data model
@@ -85,7 +85,7 @@ docs/                       erd.md, architecture.md, BookIt.postman_collection.j
 - Fields: `key` (sha256 hex of the payload, unique), `user` → User, `appointment` → Appointment (one-to-one, nullable: `NULL` while the request runs, set after the 201), `created_at`, `expires_at` (indexed).
 - It works as a shared `hash → TTL` dictionary that guards appointment creation. The same user cannot create the same appointment twice within the TTL, which in theory prevents a double charge.
 
-All foreign keys use `CASCADE`. The ERD is in `docs/erd.md`.
+All foreign keys use `CASCADE`. The ERD is in `README.md` (Data model section).
 
 ## 5. API (v1)
 | Method | Path | Auth | Success | Errors |
@@ -300,7 +300,7 @@ Brief requirement 2 (request logging + correlation id header) is covered by `Cor
   - stores tokens and ids automatically
   - includes negative examples (401, 403, 409 slot taken, 409 duplicate booking request)
   - kept in sync by the project subagent `postman-sync` (`.claude/agents/postman-sync.md`). It runs in the background after any change under `bookit/api/` (rule in `CLAUDE.md`) and adds every request with all fields, auth, test scripts and negative cases.
-- **Diagrams:** `docs/erd.md` (Mermaid `erDiagram`) and `docs/architecture.md` (Mermaid `flowchart`).
+- **Diagrams:** in `README.md`, as Mermaid: architecture `flowchart`, booking `sequenceDiagram`, error flow and `erDiagram`.
 - **Code style:** every function/class has a 1–2 line docstring. Comments only where the code is not obvious.
 
 ## 12. Bonus items
