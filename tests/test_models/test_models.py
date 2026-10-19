@@ -50,6 +50,17 @@ def test_appointment_defaults_to_pending_and_links_to_business_owner():
     assert appointment.service.business.owner == owner
 
 
+@pytest.mark.parametrize("minutes", [0, -30])
+def test_db_rejects_a_non_positive_service_duration(owner_user, minutes):
+    with pytest.raises(IntegrityError):
+        make_service(business=make_business(owner=owner_user), duration_minutes=minutes)
+
+
+def test_db_rejects_a_negative_service_price(owner_user):
+    with pytest.raises(IntegrityError):
+        make_service(business=make_business(owner=owner_user), price="-1.00")
+
+
 def test_appointment_end_must_be_after_start():
     service = make_service(business=make_business(owner=make_user(role=UserRole.BUSINESS_OWNER)))
     start = timezone.now()

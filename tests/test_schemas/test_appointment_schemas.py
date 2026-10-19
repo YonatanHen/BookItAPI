@@ -23,6 +23,9 @@ def test_create_request_parses_unix_seconds_to_utc():
         {"service_id": 3, "start_time": "tomorrow"},
         {"service_id": 3, "start_time": 1.5},
         {"service_id": 3, "start_time": True},
+        {"service_id": 3, "start_time": 0},
+        {"service_id": 3, "start_time": -60},
+        {"service_id": 3, "start_time": "-60"},
         {"service_id": 0, "start_time": TS},
         {"service_id": 3, "start_time": TS, "status": "Confirmed"},
         {"start_time": TS},
@@ -45,6 +48,8 @@ def test_list_query_reads_from_to_aliases_and_status_in_any_case():
     [
         {"from": "abc"},
         {"from": "1.5"},
+        {"from": "-5"},
+        {"to": "0"},
         {"from": "99999999999999999"},
         {"to": ""},
         {"status": "Done"},

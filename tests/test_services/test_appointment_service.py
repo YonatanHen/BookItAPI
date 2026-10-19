@@ -62,6 +62,27 @@ def test_book_allows_back_to_back_slots(appointments, client_user, haircut, star
     assert appointments.book(client=client_user, service_id=haircut.id, start_time=at(start_hours))
 
 
+@pytest.mark.parametrize(("start_minutes", "booked"), [(44, False), (45, True)])
+def test_book_handles_an_odd_minute_duration(appointments, client_user, owner_user, start_minutes, booked):
+    short = make_service(business=make_business(owner=owner_user), duration_minutes=38)
+    make_appointment(service=short, client=make_user(), start_time=at(2) + timedelta(minutes=7))
+    start = at(2) + timedelta(minutes=start_minutes)
+    if booked:
+        assert appointments.book(client=client_user, service_id=short.id, start_time=start).end_time == start + timedelta(
+            minutes=38
+        )
+    else:
+        with pytest.raises(ConflictError):
+            appointments.book(client=client_user, service_id=short.id, start_time=start)
+
+
+def test_book_detects_overlap_with_a_long_service(appointments, client_user, owner_user):
+    long_service = make_service(business=make_business(owner=owner_user), duration_minutes=150)
+    make_appointment(service=long_service, client=make_user(), start_time=at(2))
+    with pytest.raises(ConflictError):
+        appointments.book(client=client_user, service_id=long_service.id, start_time=at(4))
+
+
 def test_book_ignores_cancelled_appointments(appointments, client_user, haircut):
     make_appointment(service=haircut, client=make_user(), start_time=at(2), status=AppointmentStatus.CANCELLED)
     assert appointments.book(client=client_user, service_id=haircut.id, start_time=at(2))
