@@ -11,7 +11,7 @@ Built with **Python 3.12 · Django 5.2 · Django REST Framework · Pydantic v2 �
 
 ```bash
 python scripts/init_env.py      # creates .env from .env.example with a generated DJANGO_SECRET_KEY
-docker compose up --build       # db (Postgres) + redis + api; the api migrates and seeds on start
+docker compose up --build       # api + db (Postgres) + redis; the api migrates and seeds on start
 ```
 - The API runs at `http://localhost:8000/api/v1/`. Check it with `GET /api/v1/health` → `{"status": "OK"}`.
 - `docker compose ps` shows all three services as `(healthy)`.
@@ -113,7 +113,7 @@ flowchart TB
             m1["CorrelationIdMiddleware<br/>X-Correlation-ID + ContextVar"]
             m2["RequestLoggingMiddleware<br/>method · path · status · duration"]
             m3["ExceptionHandlingMiddleware<br/>unhandled error → 500 Problem Details"]
-            m4["SecurityMiddleware · CommonMiddleware"]
+            m4["SecurityMiddleware · CommonMiddleware (Django built-in middlewares)"]
             m1 --> m2 --> m3 --> m4
         end
 
@@ -243,7 +243,7 @@ sequenceDiagram
 flowchart LR
     e1["Pydantic ValidationError"] --> h["problem_details_exception_handler"]
     e2["Domain error<br/>NotFound · PermissionDenied · Conflict · BusinessRule · InvalidCredentials"] --> h
-    e3["DRF APIException<br/>401 · 403 · 404 · 415"] --> h
+    e3["DRF APIException<br/>401 · 403 · 404"] --> h
     e5["Ratelimited (login)"] --> h
     h --> r1["4xx application/problem+json<br/>(429 with Retry-After)"]
     e4["Any other exception"] --> m["ExceptionHandlingMiddleware"] --> r2["500 application/problem+json<br/>(traceback only in server log)"]
@@ -328,7 +328,7 @@ Requests are **not** wrapped in one transaction (`ATOMIC_REQUESTS = False`). Rea
 
 The single-column foreign-key indexes on `appointments.service_id` and `client_id` were dropped, because the composite indexes start with those columns.
 
-Search on 200,001 businesses (`EXPLAIN ANALYZE`, one run on a laptop):
+We tested a name search on 200,001 fake businesses, with and without the index (`EXPLAIN ANALYZE`, one run):
 
 | | Plan | Time |
 |---|---|---|
@@ -366,7 +366,7 @@ Import `docs/BookIt.postman_collection.json`. The `host` variable defaults to `h
 | Item | Status |
 |---|---|
 | Refresh-token flow | Done: 15 min access, 1 day refresh, no rotation |
-| Unit tests for a service class (pytest) | Done for **all** service classes |
+| Unit tests for a service class (pytest) | Developed the API in TDD so done for **all** service classes |
 | docker-compose (API + Postgres) | Done, plus Redis and healthchecks |
 | Request validation (Pydantic) | Done: all requests and responses |
-| Rate limiting on login | Done: 5/m per IP and 10/m per email → 429 |
+| Rate limiting on login | Done: 5/m per IP and 10/m per email → 429 using a tiny Redis cache |
