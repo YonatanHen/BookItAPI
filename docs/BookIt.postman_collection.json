@@ -474,6 +474,295 @@
       ]
     },
     {
+      "name": "Appointments",
+      "item": [
+        {
+          "name": "Book appointment",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const nextHour = (Math.floor(Date.now() / 1000 / 3600) + 1) * 3600;",
+                  "const offset = (Math.floor(Math.random() * 60) + 1) * 86400 + Math.floor(Math.random() * 24) * 3600;",
+                  "pm.collectionVariables.set('bookingStartTime', nextHour + offset);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test('Appointment shape', () => { pm.expect(body).to.include.all.keys('id', 'status', 'start_time', 'end_time', 'service_id', 'service_name', 'price', 'business_id', 'business_name', 'client_id', 'client_name'); pm.expect(body.status).to.eql('Pending'); pm.expect(body.start_time).to.eql(Number(pm.collectionVariables.get('bookingStartTime'))); pm.expect(body.end_time).to.be.above(body.start_time); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "JWT required, Client role only (bearer {{accessToken}}). Run 'Login as client' and 'List businesses' first. Body: service_id (required, int > 0), start_time (required, unix seconds, must be in the future). Extra fields are rejected. A pre-request script sets bookingStartTime to a whole hour 1-60 days ahead plus a random hour offset, so reruns do not collide. Response 201: {id, status: Pending, start_time, end_time, service_id, service_name, price, business_id, business_name, client_id, client_name}. Errors: 400 invalid body, past start time or unknown service id, 401 missing or invalid token, 403 caller is a business owner, 409 slot overlaps an active appointment of the same service."
+          }
+        },
+        {
+          "name": "List appointments",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Page shape', () => { pm.expect(body).to.include.all.keys('count', 'limit', 'offset', 'next', 'previous', 'results'); pm.expect(body.results).to.be.an('array'); });",
+                  "pm.test('Item shape', () => body.results.forEach(a => pm.expect(a).to.include.all.keys('id', 'status', 'start_time', 'end_time', 'service_id', 'service_name', 'price', 'business_id', 'business_name', 'client_id', 'client_name')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments"],
+              "query": [
+                { "key": "from", "value": "{{bookingStartTime}}", "disabled": true, "description": "Optional. Unix seconds, inclusive lower bound on start_time. Must be <= to." },
+                { "key": "to", "value": "{{bookingStartTime}}", "disabled": true, "description": "Optional. Unix seconds, inclusive upper bound on start_time." },
+                { "key": "status", "value": "Pending", "disabled": true, "description": "Optional. Pending, Confirmed or Cancelled (any case)." },
+                { "key": "limit", "value": "20", "description": "Optional. 1-100, default 20." },
+                { "key": "offset", "value": "0", "disabled": true, "description": "Optional. >= 0, default 0." }
+              ]
+            },
+            "description": "JWT required (bearer {{accessToken}}). A client sees their own appointments; an owner sees appointments of their own businesses (use bearer {{ownerAccessToken}}). Query: from, to (optional, unix seconds, inclusive, from <= to), status (optional, Pending|Confirmed|Cancelled, any case), limit (optional, 1-100, default 20), offset (optional, >= 0, default 0). Response 200: {count, limit, offset, next, previous, results: [appointment]}. Errors: 400 invalid query (problem+json with errors[{field, message}]), 401 missing or invalid token."
+          }
+        },
+        {
+          "name": "List appointments filtered by time and status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const t = Number(pm.collectionVariables.get('bookingStartTime'));",
+                  "pm.test('All results match the filters', () => body.results.forEach(a => { pm.expect(a.start_time).to.be.within(t - 3600, t + 3600); pm.expect(a.status).to.eql('Pending'); }));",
+                  "pm.test('Booked appointment is listed', () => pm.expect(body.results.map(a => a.start_time)).to.include(t));"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": { "type": "text/javascript", "exec": ["const t = Number(pm.collectionVariables.get('bookingStartTime'));", "pm.variables.set('rangeFrom', t - 3600);", "pm.variables.set('rangeTo', t + 3600);"] }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments?from={{rangeFrom}}&to={{rangeTo}}&status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments"],
+              "query": [
+                { "key": "from", "value": "{{rangeFrom}}", "description": "Inclusive unix seconds on start_time, one hour before bookingStartTime." },
+                { "key": "to", "value": "{{rangeTo}}", "description": "Inclusive unix seconds on start_time, one hour after bookingStartTime." },
+                { "key": "status", "value": "pending", "description": "Case-insensitive status." }
+              ]
+            },
+            "description": "Run 'Book appointment' first. Filters by start_time range and status (lowercase 'pending' shows case-insensitive matching). Responses: 200, 400 invalid query, 401."
+          }
+        },
+        {
+          "name": "Book appointment in the past",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": 946684800\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "start_time is 2000-01-01 (past). Expected 400 problem+json."
+          }
+        },
+        {
+          "name": "Book appointment with unknown service",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": 999999,\n  \"start_time\": {{bookingStartTime}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "service_id does not exist. Expected 400 problem+json."
+          }
+        },
+        {
+          "name": "Book appointment as owner",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{ownerAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "Business owners cannot book. Run 'Login as owner' first. Expected 403 problem+json."
+          }
+        },
+        {
+          "name": "Book appointment with taken slot",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "Run right after 'Book appointment': it reuses the same bookingStartTime (no new pre-request script), so the slot is taken. Expected 409 problem+json."
+          }
+        },
+        {
+          "name": "List appointments with invalid from",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));",
+                  "pm.test('Error on from', () => pm.expect(pm.response.json().errors.map(e => e.field)).to.include('from'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/appointments?from=yesterday",
+              "host": ["{{baseUrl}}"],
+              "path": ["appointments"],
+              "query": [{ "key": "from", "value": "yesterday", "description": "Invalid: must be unix seconds." }]
+            },
+            "description": "Non-numeric from. Expected 400 problem+json with errors[{field: from, message}]."
+          }
+        },
+        {
+          "name": "List appointments without token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "No Authorization header. Expected 401 problem+json."
+          }
+        },
+        {
+          "name": "Book appointment without token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "No Authorization header. Expected 401 problem+json."
+          }
+        }
+      ]
+    },
+    {
       "name": "API",
       "item": [
         {
