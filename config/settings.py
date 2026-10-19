@@ -101,6 +101,8 @@ CACHES = {
 # E003: LocMem is per process (fine for one dev process). W001: Django's built-in RedisCache is not on the library's list.
 SILENCED_SYSTEM_CHECKS = ["django_ratelimit.E003", "django_ratelimit.W001"]
 LOGIN_RATE_LIMIT = env("LOGIN_RATE_LIMIT", "5/m")
+# Higher than the IP limit: anyone who knows an email can use up its budget and lock the owner out.
+LOGIN_EMAIL_RATE_LIMIT = env("LOGIN_EMAIL_RATE_LIMIT", "10/m")
 
 IDEMPOTENCY_TTL_SECONDS = int(env("IDEMPOTENCY_TTL_SECONDS", "600"))
 IDEMPOTENCY_PURGE_INTERVAL_SECONDS = int(env("IDEMPOTENCY_PURGE_INTERVAL_SECONDS", "300"))
