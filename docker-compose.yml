@@ -1,6 +1,8 @@
 services:
   db:
     image: postgres:16
+    ports:
+      - "${DB_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${DB_NAME:-bookit}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -13,6 +15,16 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  # Shared rate-limit counters for all gunicorn workers; in-memory only, no persistence.
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "32mb", "--maxmemory-policy", "allkeys-lru"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   api:
     build: .
     env_file: .env
@@ -21,10 +33,19 @@ services:
       DB_PORT: "5432"
       DJANGO_DEBUG: "0"
       DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
 volumes:

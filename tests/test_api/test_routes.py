@@ -4,6 +4,7 @@ from django.urls import resolve, reverse
 
 ROUTES = [
     ("v1:root", {}, "/api/v1/"),
+    ("v1:health", {}, "/api/v1/health"),
     ("v1:auth-register", {}, "/api/v1/auth/register"),
     ("v1:auth-login", {}, "/api/v1/auth/login"),
     ("v1:auth-refresh", {}, "/api/v1/auth/refresh"),

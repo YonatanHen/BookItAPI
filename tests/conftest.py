@@ -1,4 +1,5 @@
 import pytest
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from bookit.models import UserRole
@@ -15,6 +16,11 @@ def fast_password_hasher(settings):
 @pytest.fixture(autouse=True)
 def reset_idempotency_purge_clock():
     IdempotencyService._last_purge_at = None
+
+
+@pytest.fixture(autouse=True)
+def clear_rate_limit_counters():
+    cache.clear()
 
 
 @pytest.fixture
