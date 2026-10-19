@@ -7,6 +7,7 @@ from bookit.api.common.pagination import PageParams
 from bookit.api.common.schema_types import CaseInsensitiveCategory, CaseInsensitiveSortOrder, SortOrder
 from bookit.api.common.schemas import ResponseSchema
 from bookit.models import Business, BusinessCategory, Service
+from bookit.services.business_service import BusinessSummary
 
 
 class BusinessListQuery(PageParams):
@@ -51,4 +52,42 @@ class BusinessOut(ResponseSchema):
             owner_id=business.owner_id,
             owner_name=business.owner.full_name,
             services=[ServiceOut.from_model(service) for service in business.services.all()],
+        )
+
+
+class ServiceSummaryOut(ResponseSchema):
+    """Upcoming-appointment totals for one service."""
+
+    service_id: int
+    service_name: str
+    price: Decimal
+    duration_minutes: int
+    upcoming_appointments: int
+    expected_revenue: Decimal
+
+
+class BusinessSummaryOut(ResponseSchema):
+    """Owner summary of a business."""
+
+    business_id: int
+    business_name: str
+    services: list[ServiceSummaryOut]
+
+    @classmethod
+    def from_model(cls, summary: BusinessSummary) -> "BusinessSummaryOut":
+        """Build the response from the annotated services."""
+        return cls(
+            business_id=summary.business.id,
+            business_name=summary.business.name,
+            services=[
+                ServiceSummaryOut(
+                    service_id=service.id,
+                    service_name=service.name,
+                    price=service.price,
+                    duration_minutes=service.duration_minutes,
+                    upcoming_appointments=service.upcoming_appointments,
+                    expected_revenue=service.expected_revenue,
+                )
+                for service in summary.services
+            ],
         )
