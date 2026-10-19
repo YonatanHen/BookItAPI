@@ -313,7 +313,7 @@ erDiagram
 
 ## How are database connections and transactions scoped per request?
 
-Each request uses Django's per-thread database connection, which stays open for `CONN_MAX_AGE = 60` seconds (with health checks), so later requests on the same worker reuse it. Requests are **not** wrapped in one transaction (`ATOMIC_REQUESTS = False`), so reads run in autocommit. Only writes that must succeed or fail together open an explicit `transaction.atomic()` in the service layer, which keeps transactions and locks short.
+Each request uses Django's per-thread database connection, which stays open for `CONN_MAX_AGE = 60` seconds (with health checks), so later requests on the same worker reuse it. Requests are **not** wrapped in one transaction (`ATOMIC_REQUESTS = False`), so reads run in autocommit. Only writes that must succeed or fail together open a short `transaction.atomic()` in the service layer; booking also locks the service row with `SELECT … FOR UPDATE`, so two parallel requests for the same slot run one after the other and the second gets 409.
 
 ## Indexes
 
