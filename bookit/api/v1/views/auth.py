@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from bookit.api.common.parsing import parse_body
+from bookit.api.common.rate_limit import login_rate_limit
 
 from ..dependencies import get_auth_service
 from ..schemas.auth import AccessTokenOut, LoginRequest, RefreshRequest, RegisterRequest, TokenPairOut, UserOut
@@ -29,8 +30,9 @@ class RegisterView(PublicView):
         return Response(UserOut.from_model(user).model_dump(mode="json"), status=status.HTTP_201_CREATED)
 
 
+@login_rate_limit
 class LoginView(PublicView):
-    """POST /auth/login: exchange credentials for an access and a refresh token."""
+    """POST /auth/login: exchange credentials for an access and a refresh token (rate-limited per IP)."""
 
     def post(self, request):
         """Validate the credentials and return a token pair."""

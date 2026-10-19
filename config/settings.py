@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.postgres",
     "rest_framework",
+    "django_ratelimit",
     "bookit",
 ]
 
@@ -89,6 +90,11 @@ SIMPLE_JWT = {
     "USER_ID_CLAIM": "user_id",
     "SIGNING_KEY": SECRET_KEY,
 }
+
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+# LocMem counts per gunicorn worker; a shared Redis cache is the production fix (see README).
+SILENCED_SYSTEM_CHECKS = ["django_ratelimit.E003", "django_ratelimit.W001"]
+LOGIN_RATE_LIMIT = env("LOGIN_RATE_LIMIT", "5/m")
 
 IDEMPOTENCY_TTL_SECONDS = int(env("IDEMPOTENCY_TTL_SECONDS", "600"))
 IDEMPOTENCY_PURGE_INTERVAL_SECONDS = int(env("IDEMPOTENCY_PURGE_INTERVAL_SECONDS", "300"))

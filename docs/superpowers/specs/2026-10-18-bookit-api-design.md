@@ -91,7 +91,7 @@ All foreign keys use `CASCADE`. The ERD is in `docs/erd.md`.
 | Method | Path | Auth | Success | Errors |
 |---|---|---|---|---|
 | POST | `/api/v1/auth/register` | public | 201 user | 400 validation, 409 email taken |
-| POST | `/api/v1/auth/login` | public | 200 `{access, refresh, token_type}` | 400 validation, 401 bad credentials, 429 throttled (bonus) |
+| POST | `/api/v1/auth/login` | public | 200 `{access, refresh, token_type}` | 400 validation, 401 bad credentials, 429 rate limited (more than `LOGIN_RATE_LIMIT`, default 5/m, per IP) |
 | POST | `/api/v1/auth/refresh` | public (refresh token in body) | 200 `{access}` | 400 missing field, 401 invalid/expired refresh |
 | GET | `/api/v1/` | JWT | 200 `{version}` | 401 |
 | GET | `/api/v1/businesses?category=&search=&order=&limit=&offset=` | JWT | 200 page | 400 bad limit/offset, unknown category or order, 401 |
@@ -305,5 +305,7 @@ Brief requirement 2 (request logging + correlation id header) is covered by `Cor
 
 ## 12. Bonus items
 - Done as part of the core: refresh token, pytest tests for the service classes, docker-compose, request validation with Pydantic.
-- Optional (last task): login rate limiting with DRF `ScopedRateThrottle` (`login`, default `5/min`) → 429.
+- Login rate limiting (done): `django-ratelimit` on `POST /auth/login` only, keyed by client IP, `LOGIN_RATE_LIMIT` (default `5/m`).
+  - `block=True` raises `Ratelimited` (a `PermissionDenied`); the exception handler maps it to 429 Problem Details with `Retry-After` = the window length.
+  - Counters live in the local-memory cache, so each gunicorn worker counts separately. A shared Redis cache is the production fix.
 - Out of scope: logout with a token blacklist.

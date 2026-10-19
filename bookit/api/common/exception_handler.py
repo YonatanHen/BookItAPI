@@ -1,6 +1,8 @@
 """DRF exception handler: maps domain, Pydantic and DRF errors to Problem Details."""
 from typing import Any
 
+from django.conf import settings
+from django_ratelimit.exceptions import Ratelimited
 from pydantic import ValidationError as PydanticValidationError
 from rest_framework import exceptions, status
 from rest_framework.response import Response
@@ -16,6 +18,7 @@ from bookit.services.exceptions import (
 )
 
 from .problem import PROBLEM_CONTENT_TYPE, problem_body
+from .rate_limit import RATE_LIMITED_DETAIL, rate_period_seconds
 
 VALIDATION_FAILED = "Request validation failed."
 
@@ -52,6 +55,8 @@ def problem_details_exception_handler(exc: Exception, context: dict[str, Any]) -
         return Response(body, status=status.HTTP_400_BAD_REQUEST, content_type=PROBLEM_CONTENT_TYPE)
     if isinstance(exc, DomainError):
         exc = _to_api_exception(exc)
+    if isinstance(exc, Ratelimited):  # subclass of PermissionDenied: map before DRF turns it into 403
+        exc = exceptions.Throttled(wait=rate_period_seconds(settings.LOGIN_RATE_LIMIT), detail=RATE_LIMITED_DETAIL)
     response = drf_exception_handler(exc, context)
     if response is None:
         return None
