@@ -14,8 +14,7 @@ flowchart TB
             m2["RequestLoggingMiddleware<br/>method · path · status · duration"]
             m3["ExceptionHandlingMiddleware<br/>unhandled error → 500 Problem Details"]
             m4["SecurityMiddleware · CommonMiddleware"]
-            m5["IdempotencyMiddleware<br/>POST /appointments · hash → TTL"]
-            m1 --> m2 --> m3 --> m4 --> m5
+            m1 --> m2 --> m3 --> m4
         end
 
         router["URL router<br/>/api/v1/ → namespace v1 (NamespaceVersioning)"]
@@ -23,6 +22,7 @@ flowchart TB
         subgraph api["API layer · bookit/api/v1"]
             direction TB
             authn["JWTAuthentication + IsAuthenticated<br/>401 no/invalid token"]
+            idem["@idempotent on POST /appointments<br/>hash → TTL · duplicate → 409"]
             views["Views<br/>auth · businesses · appointments · summary"]
             schemas["Pydantic schemas<br/>request validation · response shape"]
             handler["DRF exception handler<br/>domain errors → Problem Details"]
@@ -47,12 +47,12 @@ flowchart TB
     tests["pytest service tests<br/>fixed clock · no HTTP"]
 
     client --> m1
-    m5 --> router --> authn --> views
+    m4 --> router --> authn --> idem --> views
     views <--> schemas
     views --> s1
     views --> s2
     views --> s3
-    m5 --> s4
+    idem --> s4
     views -. "domain exceptions" .-> handler
     s1 --> orm
     s2 --> orm
@@ -70,8 +70,8 @@ flowchart TB
 
 | Layer | Folder | Responsibility | Must not |
 |---|---|---|---|
-| Middleware | `bookit/middleware/` | correlation id, request logs, last-resort 500, duplicate-booking guard | contain booking rules |
-| API | `bookit/api/v1/` | routing, JWT auth, Pydantic parse/format, status codes | contain business rules or ORM queries |
+| Middleware | `bookit/middleware/` | correlation id, request logs, last-resort 500 (every request) | contain booking rules |
+| API | `bookit/api/` | routing, JWT auth, `@idempotent` duplicate-booking guard, Pydantic parse/format, status codes | contain business rules or ORM queries |
 | Services | `bookit/services/` | business rules, ownership, transactions, domain errors | import DRF or read HTTP objects |
 | Models | `bookit/models/` | tables, enums, DB constraints | contain request logic |
 | Config | `config/` | settings from env / `.env` | contain secret values |
@@ -91,32 +91,34 @@ flowchart TB
 sequenceDiagram
     autonumber
     participant C as Client
-    participant MW as IdempotencyMiddleware
-    participant V as AppointmentListCreateView
+    participant D as DRF auth (JWT)
+    participant I as @idempotent
+    participant V as AppointmentListCreateView.post
     participant S as AppointmentService
     participant DB as PostgreSQL
 
-    C->>MW: POST /api/v1/appointments (Bearer JWT, JSON body)
-    MW->>MW: user_id from JWT, key = sha256(user_id:POST:path:canonical body)
-    MW->>DB: purge expired keys (at most every 5 min), DELETE expired same key
-    MW->>DB: INSERT idempotency_records(key, expires_at = now + TTL)
+    C->>D: POST /api/v1/appointments (Bearer JWT, JSON body)
+    D->>I: request.user resolved (else 401)
+    I->>I: key = sha256(user_id:POST:path:Idempotency-Key or canonical body)
+    I->>DB: purge expired keys (at most every 5 min), DELETE expired same key
+    I->>DB: INSERT idempotency_records(key, expires_at = now + TTL)
     alt key already exists and not expired
-        MW-->>C: 409 Duplicate booking request
+        I-->>C: ConflictError → 409 Duplicate booking request
     else key stored
-        MW->>V: forward request
+        I->>V: call handler
         V->>V: parse_body(AppointmentCreateRequest)
         V->>S: book(client, service_id, start_time)
         S->>DB: BEGIN, SELECT service FOR UPDATE
         S->>DB: overlapping non-cancelled appointment?
         alt slot taken
-            S-->>V: ConflictError
-            V-->>MW: 409 slot taken
-            MW->>DB: DELETE key (release)
+            S-->>I: ConflictError → 409 slot taken
+            I->>DB: DELETE key (release)
         else slot free
             S->>DB: INSERT appointment (Pending), COMMIT
-            V-->>MW: 201 appointment
+            V-->>I: 201 appointment
+            I->>DB: UPDATE key SET appointment_id
         end
-        MW-->>C: response
+        I-->>C: response
     end
 ```
 

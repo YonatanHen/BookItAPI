@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from bookit.api.common.idempotency import idempotent
 from bookit.api.common.pagination import paginate
 from bookit.api.common.parsing import parse_body, parse_query
 
@@ -21,6 +22,7 @@ class AppointmentListCreateView(APIView):
         )
         return Response(paginate(appointments, query, request, AppointmentOut).model_dump(mode="json"))
 
+    @idempotent
     def post(self, request):
         """Book an appointment for the calling client."""
         payload = parse_body(AppointmentCreateRequest, request)

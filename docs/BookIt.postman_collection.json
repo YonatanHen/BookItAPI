@@ -504,13 +504,42 @@
           ],
           "request": {
             "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "my-unique-key-123", "disabled": true, "description": "Optional. Replaces the body in the idempotency hash. Same user + same key within 10 minutes returns 409." }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
+            "description": "JWT required, Client role only (bearer {{accessToken}}). Run 'Login as client' and 'List businesses' first. Body: service_id (required, int > 0), start_time (required, positive unix seconds, must be in the future). Extra fields are rejected. Optional header Idempotency-Key: if sent, its value replaces the body in the duplicate-detection hash. The same user sending the same body (key order and spacing ignored) or key within 10 minutes gets 409; a failed (4xx) booking releases the key. A pre-request script sets bookingStartTime to a whole hour 1-60 days ahead plus a random hour offset, so reruns do not collide. Response 201: {id, status: Pending, start_time, end_time, service_id, service_name, price, business_id, business_name, client_id, client_name}. Errors: 400 invalid body, past start time or unknown service id, 401 missing or invalid token, 403 caller is a business owner, 409 duplicate booking request or slot overlaps an active appointment of the same service."
+          }
+        },
+        {
+          "name": "Book the same appointment again (duplicate)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));",
+                  "pm.test('Duplicate detail', () => pm.expect(pm.response.json().detail).to.eql('Duplicate booking request. The same booking was already submitted.'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
             },
             "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
-            "description": "JWT required, Client role only (bearer {{accessToken}}). Run 'Login as client' and 'List businesses' first. Body: service_id (required, int > 0), start_time (required, positive unix seconds, must be in the future). Extra fields are rejected. A pre-request script sets bookingStartTime to a whole hour 1-60 days ahead plus a random hour offset, so reruns do not collide. Response 201: {id, status: Pending, start_time, end_time, service_id, service_name, price, business_id, business_name, client_id, client_name}. Errors: 400 invalid body, past start time or unknown service id, 401 missing or invalid token, 403 caller is a business owner, 409 slot overlaps an active appointment of the same service."
+            "description": "Run right after 'Book appointment'. Same body, same client token, no new pre-request script, within 10 minutes. The idempotency middleware returns 409 problem+json with detail 'Duplicate booking request. The same booking was already submitted.'"
           }
         },
         {
@@ -690,25 +719,39 @@
           "name": "Book appointment with taken slot",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const rnd = () => Math.random().toString(36).slice(2);",
+                  "pm.variables.set('idempotencyKey', rnd() + rnd());"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Status is 409', () => pm.response.to.have.status(409));",
-                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));"
+                  "pm.test('Problem+json', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/problem+json'));",
+                  "pm.test('Slot conflict, not duplicate request', () => pm.expect(pm.response.json().detail).to.not.include('Duplicate booking request'));"
                 ]
               }
             }
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}", "description": "Fresh random value per run (pre-request script). Changes the idempotency hash so the request reaches the slot-overlap check." }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"service_id\": {{serviceId}},\n  \"start_time\": {{bookingStartTime}}\n}"
             },
             "url": { "raw": "{{baseUrl}}/appointments", "host": ["{{baseUrl}}"], "path": ["appointments"] },
-            "description": "Run right after 'Book appointment': it reuses the same bookingStartTime (no new pre-request script), so the slot is taken. Expected 409 problem+json."
+            "description": "Run right after 'Book appointment': same service and bookingStartTime, same client. A random Idempotency-Key replaces the body in the idempotency hash, so the duplicate check passes and the slot-overlap check returns 409 problem+json. The test asserts the detail is not the duplicate-request message."
           }
         },
         {
