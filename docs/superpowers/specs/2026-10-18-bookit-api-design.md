@@ -260,7 +260,7 @@ Brief requirement 2 (request logging + correlation id header) is covered by `Cor
   - copies `.env.example` to `.env`
   - fills `DJANGO_SECRET_KEY` with `secrets.token_urlsafe(50)`
   - never overwrites an existing `.env`
-- `DB_PASSWORD` in `.env` must match `POSTGRES_PASSWORD` in the `docker run` command (`bookit` for local development).
+- Compose creates the `db` service from `DB_NAME` / `DB_USER` / `DB_PASSWORD` in `.env` and publishes it on `localhost:${DB_PORT}`. Local tests and `runserver` use it through `docker compose up -d db`.
 - Docker Compose:
   - the `api` service reads `env_file: .env` and overrides `DB_HOST=db`
   - the `db` service gets `POSTGRES_PASSWORD: ${DB_PASSWORD}` through compose variable interpolation
@@ -291,7 +291,7 @@ Brief requirement 2 (request logging + correlation id header) is covered by `Cor
   - No Claude attribution in commit messages.
 - **Docker:** the `Dockerfile` and `docker-compose.yml` start `db` (postgres:16 with a healthcheck) and `api`. The `api` entrypoint runs migrate → seed → gunicorn.
 - **README:**
-  - setup (docker run command, venv, compose)
+  - setup (compose, or `compose up -d db` + venv)
   - seeded credentials and endpoint table
   - token lifecycle, error format and idempotency (with the payment note)
   - transaction answer and links to the diagrams
