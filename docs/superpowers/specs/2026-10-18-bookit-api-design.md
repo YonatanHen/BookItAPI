@@ -67,7 +67,7 @@ docs/                       erd.md, architecture.md, BookIt.postman_collection.j
 - DB check constraint: `role` must be a `UserRole` value.
 
 **Business** (table `businesses`):
-- Fields: `name`, `category` (`BusinessCategory` enum, indexed), `owner` → User.
+- Fields: `name` (`pg_trgm` GIN index on `UPPER(name)` for `?search=`), `category` (`BusinessCategory` enum, indexed), `owner` → User.
 - DB check constraint: `category` must be a `BusinessCategory` value.
 
 **Service** (table `services`):
@@ -76,7 +76,7 @@ docs/                       erd.md, architecture.md, BookIt.postman_collection.j
 **Appointment** (table `appointments`):
 - Fields: `service` → Service, `client` → User, `start_time`, `end_time`, `status`, `created_at`.
 - `end_time` is calculated at booking time (`start + duration`). It makes the overlap query a simple range comparison.
-- Indexes: `(service, start_time)` and `(client, start_time)`.
+- Indexes: `(service, start_time)` and `(client, start_time)`. The FKs have no single-column index (`db_index=False`), because these composites cover them.
 - Check constraints:
   - `end_time > start_time`
   - `status` must be a valid enum value
