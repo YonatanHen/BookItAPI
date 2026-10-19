@@ -89,6 +89,9 @@ SIMPLE_JWT = {
     "SIGNING_KEY": SECRET_KEY,
 }
 
+# Only the seed command needs it; the command fails with a clear message when it is empty.
+SEED_USER_PASSWORD = os.environ.get("SEED_USER_PASSWORD", "")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
