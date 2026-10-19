@@ -1,10 +1,13 @@
 """Reusable annotated Pydantic types for API schemas."""
+from datetime import UTC, datetime
 from enum import Enum, StrEnum
 from typing import Annotated, Any
 
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, PlainSerializer
 
 from bookit.models import AppointmentStatus, BusinessCategory
+
+_TIMESTAMP_ERROR = "must be a unix timestamp in seconds"
 
 
 class SortOrder(StrEnum):
@@ -28,6 +31,28 @@ def case_insensitive_enum(enum_cls: type[Enum]) -> BeforeValidator:
     return BeforeValidator(_match)
 
 
+def _to_utc_datetime(value: Any) -> datetime:
+    """Accept integer seconds (int or digit string) and return an aware UTC datetime."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError(_TIMESTAMP_ERROR)
+    if isinstance(value, str) and not value.strip().lstrip("-").isdigit():
+        raise ValueError(_TIMESTAMP_ERROR)
+    try:
+        return datetime.fromtimestamp(int(value), tz=UTC)
+    except (OverflowError, OSError, ValueError) as exc:
+        raise ValueError("unix timestamp is out of range") from exc
+
+
+def _to_unix_seconds(value: datetime) -> int:
+    """Serialize a datetime as integer unix seconds."""
+    return int(value.timestamp())
+
+
+UnixTimestamp = Annotated[
+    datetime, BeforeValidator(_to_utc_datetime), PlainSerializer(_to_unix_seconds, return_type=int)
+]
 CaseInsensitiveStatus = Annotated[AppointmentStatus, case_insensitive_enum(AppointmentStatus)]
 CaseInsensitiveCategory = Annotated[BusinessCategory, case_insensitive_enum(BusinessCategory)]
 CaseInsensitiveSortOrder = Annotated[SortOrder, case_insensitive_enum(SortOrder)]

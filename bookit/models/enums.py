@@ -17,6 +17,9 @@ class AppointmentStatus(models.TextChoices):
     CANCELLED = "Cancelled", "Cancelled"
 
 
+ACTIVE_APPOINTMENT_STATUSES = (AppointmentStatus.PENDING, AppointmentStatus.CONFIRMED)
+
+
 class BusinessCategory(models.TextChoices):
     """Kind of business listed on the platform."""
 
