@@ -267,7 +267,7 @@
                 "exec": [
                   "pm.test('Status is 200', () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
-                  "pm.test('Page shape', () => { pm.expect(body).to.include.all.keys('count', 'limit', 'offset', 'next', 'previous', 'results'); pm.expect(body.limit).to.eql(20); pm.expect(body.offset).to.eql(0); pm.expect(body.previous).to.eql(null); pm.expect(body.results).to.be.an('array'); });",
+                  "pm.test('Page shape', () => { pm.expect(body).to.include.all.keys('count', 'limit', 'offset', 'next', 'previous', 'results'); pm.expect(body.limit).to.eql(100); pm.expect(body.offset).to.eql(0); pm.expect(body.previous).to.eql(null); pm.expect(body.results).to.be.an('array'); });",
                   "pm.test('Item shape', () => body.results.forEach(b => { pm.expect(b).to.include.all.keys('id', 'name', 'category', 'owner_id', 'owner_name', 'services'); b.services.forEach(s => pm.expect(s).to.include.all.keys('id', 'name', 'duration_minutes', 'price')); }));",
                   "if (body.results.length) {",
                   "  pm.collectionVariables.set('businessId', body.results[0].id);",
