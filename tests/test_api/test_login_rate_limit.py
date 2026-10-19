@@ -52,6 +52,30 @@ def test_limit_resets_in_the_next_minute(api_client, client_user):
         assert _login(api_client, client_user.email).status_code == 401
 
 
+EMAIL_LIMIT = 10
+
+
+def test_one_email_is_limited_across_many_ips(api_client, client_user):
+    statuses = [_login(api_client, client_user.email, ip=f"10.0.1.{n}").status_code for n in range(EMAIL_LIMIT + 1)]
+    assert statuses == [401] * EMAIL_LIMIT + [429]
+
+
+def test_email_limit_ignores_case_and_spaces(api_client, client_user):
+    for n in range(EMAIL_LIMIT):
+        _login(api_client, client_user.email.upper(), ip=f"10.0.1.{n}")
+    assert _login(api_client, f"  {client_user.email}  ", ip="10.0.2.1").status_code == 429
+
+
+def test_email_limit_does_not_block_other_emails(api_client, client_user):
+    for n in range(EMAIL_LIMIT + 1):
+        _login(api_client, client_user.email, ip=f"10.0.1.{n}")
+    assert _login(api_client, "someone-else@bookit.dev", ip="10.0.2.1").status_code == 401
+
+
+def test_non_object_body_is_still_a_validation_error(api_client):
+    assert api_client.post(LOGIN, ["not", "an", "object"]).status_code == 400
+
+
 def test_other_auth_endpoints_are_not_rate_limited(api_client):
     statuses = {api_client.post("/api/v1/auth/refresh", {"refresh": "bad"}).status_code for _ in range(LIMIT + 2)}
     assert statuses == {401}

@@ -91,7 +91,7 @@ All foreign keys use `CASCADE`. The ERD is in `docs/erd.md`.
 | Method | Path | Auth | Success | Errors |
 |---|---|---|---|---|
 | POST | `/api/v1/auth/register` | public | 201 user | 400 validation, 409 email taken |
-| POST | `/api/v1/auth/login` | public | 200 `{access, refresh, token_type}` | 400 validation, 401 bad credentials, 429 rate limited (more than `LOGIN_RATE_LIMIT`, default 5/m, per IP) |
+| POST | `/api/v1/auth/login` | public | 200 `{access, refresh, token_type}` | 400 validation, 401 bad credentials, 429 rate limited (more than 5/m per IP or 10/m per email) |
 | POST | `/api/v1/auth/refresh` | public (refresh token in body) | 200 `{access}` | 400 missing field, 401 invalid/expired refresh |
 | GET | `/api/v1/` | JWT | 200 `{version}` | 401 |
 | GET | `/api/v1/businesses?category=&search=&order=&limit=&offset=` | JWT | 200 page | 400 bad limit/offset, unknown category or order, 401 |
@@ -305,7 +305,9 @@ Brief requirement 2 (request logging + correlation id header) is covered by `Cor
 
 ## 12. Bonus items
 - Done as part of the core: refresh token, pytest tests for the service classes, docker-compose, request validation with Pydantic.
-- Login rate limiting (done): `django-ratelimit` on `POST /auth/login` only, keyed by client IP, `LOGIN_RATE_LIMIT` (default `5/m`).
-  - `block=True` raises `Ratelimited` (a `PermissionDenied`); the exception handler maps it to 429 Problem Details with `Retry-After` = the window length.
+- Login rate limiting (done): `django-ratelimit` on `POST /auth/login` only, with two stacked limits:
+  - per client IP: `LOGIN_RATE_LIMIT` (default `5/m`)
+  - per email (trimmed, lower-cased, from the JSON body): `LOGIN_EMAIL_RATE_LIMIT` (default `10/m`). It is higher because anyone who knows an email can use up its budget and lock the owner out.
+  - `block=True` raises `Ratelimited` (a `PermissionDenied`); the exception handler maps it to 429 Problem Details with `Retry-After` = the longer of the two windows.
   - Counters: in Docker, a small `redis` service (in-memory, no persistence) shared by all gunicorn workers, through `REDIS_URL`. Without `REDIS_URL` (local dev, tests) the local-memory cache is used.
 - Out of scope: logout with a token blacklist.

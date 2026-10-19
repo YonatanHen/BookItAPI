@@ -113,7 +113,7 @@
               "raw": "{\n  \"email\": \"client1@bookit.dev\",\n  \"password\": \"{{seedPassword}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
-            "description": "Public. Body: email (required, valid email), password (required, 1-128 chars). Uses seed user client1@bookit.dev. Saves accessToken and refreshToken. Responses: 200 (access, refresh, token_type=Bearer), 400 invalid body, 401 wrong credentials, 429 rate limit (5 attempts per minute per IP, Retry-After: 60)."
+            "description": "Public. Body: email (required, valid email), password (required, 1-128 chars). Uses seed user client1@bookit.dev. Saves accessToken and refreshToken. Responses: 200 (access, refresh, token_type=Bearer), 400 invalid body, 401 wrong credentials, 429 rate limit (two stacked limits: 5 attempts per minute per client IP and 10 per minute per email, trimmed and lower-cased; Retry-After: 60)."
           }
         },
         {
@@ -143,7 +143,7 @@
               "raw": "{\n  \"email\": \"owner1@bookit.dev\",\n  \"password\": \"{{seedPassword}}\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
-            "description": "Public. Same body as 'Login as client', with seed user owner1@bookit.dev. Saves ownerAccessToken and ownerId (user_id claim of the JWT). Responses: 200, 400, 401, 429 rate limit (5 attempts per minute per IP, Retry-After: 60)."
+            "description": "Public. Same body as 'Login as client', with seed user owner1@bookit.dev. Saves ownerAccessToken and ownerId (user_id claim of the JWT). Responses: 200, 400, 401, 429 rate limit (two stacked limits: 5 attempts per minute per client IP and 10 per minute per email, trimmed and lower-cased; Retry-After: 60)."
           }
         },
         {
@@ -197,7 +197,7 @@
               "raw": "{\n  \"email\": \"client1@bookit.dev\",\n  \"password\": \"WrongPassword!1\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
-            "description": "Valid body with a wrong password. Expected 401 problem+json. Can also return 429 when the per-IP login limit (5 per minute) is exceeded."
+            "description": "Valid body with a wrong password. Expected 401 problem+json. Can also return 429 when either login limit is exceeded: 5 per minute per client IP or 10 per minute per email (trimmed, lower-cased)."
           }
         },
         {
@@ -1098,7 +1098,7 @@
               "raw": "{\n  \"email\": \"nobody@bookit.dev\",\n  \"password\": \"wrong-password\"\n}"
             },
             "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
-            "description": "Public. The pre-request script sends 5 wrong-password logins with pm.sendRequest, then this request is the 6th. It uses up the per-IP login budget (LOGIN_RATE_LIMIT, default 5 per minute) for one minute, so any login in the next minute also returns 429. Keep it last in the run. Expected 429 problem+json with Retry-After: 60 and detail 'Too many login attempts. Try again later.'."
+            "description": "Public. The pre-request script sends 5 wrong-password logins with pm.sendRequest, then this request is the 6th. It uses up the per-IP login budget (LOGIN_RATE_LIMIT, 5 per minute per client IP) for one minute, so any login in the next minute also returns 429. A second, stacked limit applies per email (LOGIN_EMAIL_RATE_LIMIT, 10 per minute, email trimmed and lower-cased from the JSON body); exceeding either limit returns 429. Keep it last in the run. Expected 429 problem+json with Retry-After: 60 and detail 'Too many login attempts. Try again later.'."
           }
         }
       ]

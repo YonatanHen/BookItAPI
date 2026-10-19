@@ -29,6 +29,8 @@ def test_composite_indexes_still_cover_the_fks():
 def test_business_search_query_can_use_the_trigram_index():
     queryset = BusinessService().list_businesses(search="cut")
     with connection.cursor() as cursor:
-        cursor.execute("SET LOCAL enable_seqscan = off")  # tiny test table: force the planner to show index use
+        # Tiny test table: leave only bitmap scans, the way a GIN index is read.
+        cursor.execute("SET LOCAL enable_seqscan = off")
+        cursor.execute("SET LOCAL enable_indexscan = off")
         plan = queryset.explain()
     assert "businesses_name_trgm_idx" in plan
