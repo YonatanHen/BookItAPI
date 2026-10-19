@@ -17,7 +17,7 @@
 - One feature per branch named `dev/<feature>`. Never merge to `master` locally: push the branch, open a GitHub PR in implementation order, and start the next task only after the user approves the PR.
 - After adding or changing an endpoint, view, route or schema under `bookit/api/`, run the `postman-sync` subagent in the background and commit the updated collection with the task.
 - Never push without asking. Never add Claude / Co-Authored-By attribution to commits or PRs.
-- Windows: run Python as `.venv/Scripts/python`; start Postgres with `docker start bookit-db`.
+- Windows: run Python as `.venv/Scripts/python`; start Postgres with `docker compose up -d db` (published on `localhost:${DB_PORT}`).
 
 ## Code style
 - Every production function and class gets a 1–2 line docstring; test functions do not need one.
