@@ -18,7 +18,7 @@ erDiagram
     }
     BUSINESSES {
         bigint id PK
-        varchar name
+        varchar name "trigram GIN index on UPPER(name)"
         varchar category "BusinessCategory enum, indexed"
         bigint owner_id FK "users.id"
     }
@@ -31,9 +31,9 @@ erDiagram
     }
     APPOINTMENTS {
         bigint id PK
-        bigint service_id FK "services.id"
-        bigint client_id FK "users.id"
-        timestamptz start_time "index (service_id, start_time)"
+        bigint service_id FK "services.id, covered by the composite index"
+        bigint client_id FK "users.id, covered by the composite index"
+        timestamptz start_time "indexes (service_id, start_time) and (client_id, start_time)"
         timestamptz end_time "start + duration, check > start"
         varchar status "AppointmentStatus: Pending | Confirmed | Cancelled"
         timestamptz created_at

@@ -9,8 +9,11 @@ from .service import Service
 class Appointment(models.Model):
     """A booked time slot; end_time is stored to make overlap checks a range query."""
 
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="appointments")
-    client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="appointments")
+    # db_index=False: the composite (service, start_time) / (client, start_time) indexes cover FK lookups.
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="appointments", db_index=False)
+    client = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="appointments", db_index=False
+    )
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     status = models.CharField(max_length=20, choices=AppointmentStatus.choices, default=AppointmentStatus.PENDING)
