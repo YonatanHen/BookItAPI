@@ -357,13 +357,6 @@ Import `docs/BookIt.postman_collection.json`. The `host` variable defaults to `h
 - Run the whole collection in Collection Runner, in order.
 - The last folder, "Rate limit", uses up the login budget of your IP for one minute.
 
-## Known limitations and next steps
-
-- **No status-change endpoint.** `Cancelled` exists, and it frees the slot, but there is no `PATCH /appointments/{id}/status` yet.
-- **A duplicate booking gets 409, not a replay of the first 201.** A client that lost the first response checks `GET /appointments`. For payments, the next step is to store and replay the first response.
-- **Deep `OFFSET` pages get slower**, because Postgres still reads the skipped rows. At scale the next step is keyset (cursor) pagination.
-- **Expected revenue uses the current service price.** Storing the price on each appointment would keep old bookings at their booked price.
-
 ## Bonus items
 
 | Item | Status |
