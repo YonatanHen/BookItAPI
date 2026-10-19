@@ -1,6 +1,8 @@
+import threading
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from django.db import connection
 
 from bookit.models import Appointment, AppointmentStatus, UserRole
 from bookit.services.appointment_service import AppointmentService
@@ -92,6 +94,37 @@ def test_book_allows_the_same_time_on_another_service(appointments, client_user,
     make_appointment(service=haircut, client=make_user(), start_time=at(2))
     other = make_service(business=haircut.business)
     assert appointments.book(client=client_user, service_id=other.id, start_time=at(2))
+
+
+@pytest.mark.django_db(transaction=True)
+def test_parallel_bookings_of_one_slot_let_only_one_win():
+    threads_count = 8
+    service = make_service(business=make_business(owner=make_user(role=UserRole.BUSINESS_OWNER)), duration_minutes=60)
+    clients = [make_user() for _ in range(threads_count)]
+    barrier = threading.Barrier(threads_count)
+    outcomes = []
+
+    def book(client, offset_minutes):
+        try:
+            barrier.wait()
+            AppointmentService(clock=lambda: NOW).book(
+                client=client, service_id=service.id, start_time=at(2) + timedelta(minutes=offset_minutes)
+            )
+            outcomes.append("booked")
+        except ConflictError:
+            outcomes.append("conflict")
+        finally:
+            connection.close()
+
+    # Each thread gets its own DB connection, so the requests really race in Postgres.
+    threads = [threading.Thread(target=book, args=(client, i * 5)) for i, client in enumerate(clients)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(outcomes) == ["booked"] + ["conflict"] * (threads_count - 1)
+    assert Appointment.objects.filter(service=service).count() == 1
 
 
 def test_client_sees_only_own_appointments(appointments, client_user, haircut):

@@ -18,7 +18,9 @@ def test_page_params_parse_query_strings():
     assert (params.limit, params.offset) == (10, 30)
 
 
-@pytest.mark.parametrize("params", [{"limit": "0"}, {"limit": "101"}, {"limit": "abc"}, {"offset": "-1"}])
+@pytest.mark.parametrize(
+    "params", [{"limit": "0"}, {"limit": "101"}, {"limit": "abc"}, {"offset": "-1"}, {"offset": "2147483648"}]
+)
 def test_invalid_page_params_are_rejected(params):
     with pytest.raises(ValidationError):
         PageParams.model_validate(params)
@@ -57,3 +59,8 @@ def test_business_out_includes_owner_and_services(owner_user):
         "owner_name": "Oscar Owner",
         "services": [{"id": service.id, "name": "Haircut", "duration_minutes": 30, "price": "45.00"}],
     }
+
+
+def test_nul_byte_in_a_query_string_is_rejected():
+    with pytest.raises(ValidationError):
+        BusinessListQuery.model_validate({"search": "\x00abc"})

@@ -10,13 +10,14 @@ from .schemas import QuerySchema
 ItemT = TypeVar("ItemT", bound=BaseModel)
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100
+MAX_OFFSET = 2**31 - 1  # far below Postgres bigint, so a huge offset is a 400, not a DB error
 
 
 class PageParams(QuerySchema):
     """Shared `limit` and `offset` query parameters."""
 
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
-    offset: int = Field(default=0, ge=0)
+    offset: int = Field(default=0, ge=0, le=MAX_OFFSET)
 
 
 class Page(BaseModel, Generic[ItemT]):

@@ -68,3 +68,8 @@ def test_query_count_does_not_grow_with_rows(auth_client, client_user):
         make_service(business=business)
         make_service(business=business)
     assert count_queries() == baseline
+
+
+@pytest.mark.parametrize("params", [{"offset": "99999999999999999999"}, {"search": "\x00abc"}])
+def test_out_of_range_offset_and_nul_byte_return_400(auth_client, client_user, params):
+    assert auth_client(client_user).get(URL, params).status_code == 400

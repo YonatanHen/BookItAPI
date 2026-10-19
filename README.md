@@ -21,7 +21,12 @@ docker compose up --build       # api + db (Postgres) + redis; the api migrates 
 ## Local development (without the api container)
 
 1. Create the environment file: `python scripts/init_env.py`. Secrets are never in code; `.env` is gitignored.
-2. Start only the database: `docker compose up -d db`.
+2. Start only the database: `docker compose up -d db`. Or use the plain Docker command from the brief; it matches the default `.env` values:
+   ```bash
+   docker run --name bookit-db -e POSTGRES_PASSWORD=bookit -e POSTGRES_DB=bookit \
+     -p 5432:5432 -d postgres:16
+   ```
+   Both publish port 5432, so run only one of them.
 3. Install and run:
    ```bash
    python -m venv .venv
@@ -313,9 +318,7 @@ erDiagram
 
 ## How are database connections and transactions scoped per request?
 
-Each request uses Django's per-thread database connection. It opens on the first query and stays open for `CONN_MAX_AGE = 60` seconds, with health checks. So later requests on the same worker reuse it instead of reconnecting.
-
-Requests are **not** wrapped in one transaction (`ATOMIC_REQUESTS = False`). Reads run in autocommit. Only writes that must succeed or fail together open an explicit `transaction.atomic()` in the service layer. Examples: booking (lock the service row with `SELECT … FOR UPDATE`, check overlaps, insert), registration and seeding. This keeps transactions and locks short, and makes them part of the business logic, not the HTTP layer.
+Each request uses Django's per-thread database connection, which stays open for `CONN_MAX_AGE = 60` seconds (with health checks), so later requests on the same worker reuse it. Requests are **not** wrapped in one transaction (`ATOMIC_REQUESTS = False`), so reads run in autocommit. Only writes that must succeed or fail together open a short `transaction.atomic()` in the service layer; booking also locks the service row with `SELECT … FOR UPDATE`, so two parallel requests for the same slot run one after the other and the second gets 409.
 
 ## Indexes
 
