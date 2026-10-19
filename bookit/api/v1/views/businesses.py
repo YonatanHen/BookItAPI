@@ -7,7 +7,7 @@ from bookit.api.common.parsing import parse_query
 from bookit.api.common.schema_types import SortOrder
 
 from ..dependencies import get_business_service
-from ..schemas.businesses import BusinessListQuery, BusinessOut
+from ..schemas.businesses import BusinessListQuery, BusinessOut, BusinessSummaryOut
 
 
 class BusinessListView(APIView):
@@ -20,3 +20,12 @@ class BusinessListView(APIView):
             category=query.category, search=query.search, descending=query.order is SortOrder.DESC
         )
         return Response(paginate(businesses, query, request, BusinessOut).model_dump(mode="json"))
+
+
+class BusinessSummaryView(APIView):
+    """GET /businesses/{id}/summary: upcoming appointments and expected revenue per service (owner only)."""
+
+    def get(self, request, business_id: int):
+        """Return the summary, or 404/403 from the service layer."""
+        summary = get_business_service().get_summary(user=request.user, business_id=business_id)
+        return Response(BusinessSummaryOut.from_model(summary).model_dump(mode="json"))

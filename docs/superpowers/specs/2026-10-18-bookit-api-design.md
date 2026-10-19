@@ -47,7 +47,7 @@ bookit/
     urls.py                 mounts each version under its own namespace
     common/                 problem.py, exception_handler.py, pagination.py, error_views.py, idempotency.py,
                             schemas.py (base schemas), schema_types.py, parsing.py (parse_body / parse_query)
-    v1/                     urls.py, dependencies.py, views/, schemas/
+    v1/                     urls.py (mounts routes/), routes/ (one URLconf per resource), dependencies.py, views/, schemas/
   middleware/               correlation.py, request_logging.py, exception_handling.py
   management/commands/      seed.py, purge_idempotency_keys.py
 tests/                      factories.py, conftest.py, test_models/, test_services/, test_api/, test_middleware/

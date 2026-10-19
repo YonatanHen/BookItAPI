@@ -1,13 +1,11 @@
-"""URL routes of API v1."""
-from django.urls import path
+"""URL routes of API v1: one included URLconf per resource."""
+from django.urls import include, path
 
-from .views import AppointmentListCreateView, ApiRootView, BusinessListView, LoginView, RefreshView, RegisterView
+from .views import ApiRootView
 
 urlpatterns = [
     path("", ApiRootView.as_view(), name="root"),
-    path("auth/register", RegisterView.as_view(), name="auth-register"),
-    path("auth/login", LoginView.as_view(), name="auth-login"),
-    path("auth/refresh", RefreshView.as_view(), name="auth-refresh"),
-    path("businesses", BusinessListView.as_view(), name="business-list"),
-    path("appointments", AppointmentListCreateView.as_view(), name="appointment-list"),
+    path("auth/", include("bookit.api.v1.routes.auth")),
+    path("businesses", include("bookit.api.v1.routes.businesses")),
+    path("appointments", include("bookit.api.v1.routes.appointments")),
 ]

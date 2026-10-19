@@ -83,6 +83,7 @@ flowchart TB
 
 **Versioning:**
 - `bookit/api/urls.py` mounts `v1/` with `namespace="v1"`.
+- `v1/urls.py` mounts one URLconf per resource from `v1/routes/` (`auth`, `businesses`, `appointments`) with `include()`.
 - A future `v2/` package gets its own urls, views and schemas and reuses the same services.
 
 ## Booking sequence (with idempotency)
