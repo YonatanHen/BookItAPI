@@ -346,7 +346,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/businesses?search=CUT",
+              "raw": "{{baseUrl}}/businesses?search=Bar",
               "host": ["{{baseUrl}}"],
               "path": ["businesses"],
               "query": [{ "key": "search", "value": "CUT", "description": "Case-insensitive name substring, max 200 chars." }]
