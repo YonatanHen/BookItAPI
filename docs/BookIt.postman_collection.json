@@ -958,6 +958,28 @@
             "url": { "raw": "{{baseUrl}}/", "host": ["{{baseUrl}}"], "path": [""] },
             "description": "JWT required (bearer {{accessToken}}). Run 'Login as client' first. Responses: 200 {\"version\": \"v1\"}, 401 missing or invalid token."
           }
+        },
+        {
+          "name": "Health check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Body is {status: OK}', () => pm.expect(pm.response.json()).to.eql({ status: 'OK' }));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] },
+            "description": "Public, no token. Checks the API and the database. Responses: 200 {\"status\": \"OK\"} when both are up, 503 {\"status\": \"UNAVAILABLE\"} when the database is down."
+          }
         }
       ]
     },
