@@ -2,6 +2,7 @@
 from .appointment import Appointment
 from .business import Business
 from .enums import ACTIVE_APPOINTMENT_STATUSES, AppointmentStatus, BusinessCategory, UserRole
+from .idempotency import IdempotencyRecord
 from .service import Service
 from .user import User
 
@@ -11,6 +12,7 @@ __all__ = [
     "AppointmentStatus",
     "Business",
     "BusinessCategory",
+    "IdempotencyRecord",
     "Service",
     "User",
     "UserRole",

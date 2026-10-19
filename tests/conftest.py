@@ -3,12 +3,18 @@ from rest_framework.test import APIClient
 
 from bookit.models import UserRole
 from bookit.services.auth_service import AuthService
+from bookit.services.idempotency_service import IdempotencyService
 from tests.factories import make_user
 
 
 @pytest.fixture(autouse=True)
 def fast_password_hasher(settings):
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
+@pytest.fixture(autouse=True)
+def reset_idempotency_purge_clock():
+    IdempotencyService._last_purge_at = None
 
 
 @pytest.fixture

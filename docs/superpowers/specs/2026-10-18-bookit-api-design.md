@@ -45,10 +45,10 @@ bookit/
                             appointment_service.py, idempotency_service.py, seed_service.py
   api/
     urls.py                 mounts each version under its own namespace
-    common/                 problem.py, exception_handler.py, pagination.py, error_views.py,
+    common/                 problem.py, exception_handler.py, pagination.py, error_views.py, idempotency.py,
                             schemas.py (base schemas), schema_types.py, parsing.py (parse_body / parse_query)
     v1/                     urls.py, dependencies.py, views/, schemas/
-  middleware/               correlation.py, request_logging.py, exception_handling.py, idempotency.py
+  middleware/               correlation.py, request_logging.py, exception_handling.py
   management/commands/      seed.py, purge_idempotency_keys.py
 tests/                      factories.py, conftest.py, test_models/, test_services/, test_api/, test_middleware/
 docs/                       erd.md, architecture.md, BookIt.postman_collection.json, superpowers/
@@ -200,20 +200,21 @@ Unknown version (for example `/api/v2/...`) → 404.
    - Returns a generic 500 Problem Details response (`"An unexpected error occurred."`), without exception text or stack trace.
    - Ignores `Http404`, `PermissionDenied`, `BadRequest` and `SuspiciousOperation`, because Django already handles them.
 4. Django `SecurityMiddleware`, `CommonMiddleware` (`APPEND_SLASH = False`).
-5. **`IdempotencyMiddleware`**: see section 8.
+
+Brief requirement 2 (request logging + correlation id header) is covered by `CorrelationIdMiddleware` + `RequestLoggingMiddleware` together.
 
 ## 8. Booking idempotency
 - **Purpose:**
   - A retry, double-click or network replay must not create a second booking.
   - This prepares for payments: one logical request = at most one charge.
   - When payments are added, the charge happens inside the protected request, so a duplicate request is rejected before it can charge again.
-- **Scope:** `IDEMPOTENT_ROUTES = [("POST", r"^/api/v\d+/appointments/?$")]`. Other routes can opt in through this setting.
+- **Scope:** the `@idempotent` decorator (`api/common/idempotency.py`) on the view handler `AppointmentListCreateView.post`. Other create handlers opt in by adding the decorator.
+- **Why a DRF decorator, not a middleware:** DRF authenticates inside the view, after all Django middlewares. The decorator runs after authentication and permissions, so it uses `request.user` (one JWT decode), and unauthenticated requests get 401 before it runs. Payment APIs (Stripe, PayPal) place idempotency the same way: after auth, before the handler.
 - **Key:** `sha256(f"{user_id}:{method}:{path}:{material}")`.
   - `material` is the `Idempotency-Key` header value, if the client sent one.
   - Otherwise `material` is the canonical JSON body (`sort_keys=True`, compact separators).
   - A body that is not valid JSON is hashed as raw text.
   - The key uses the user id, not the token, so it stays the same after a token refresh.
-- **User:** the middleware runs before DRF, so it calls `JWTAuthentication().authenticate(request)`. If there is no valid token, the request passes through untouched and the view returns 401.
 - **Storage:** the `IdempotencyRecord` DB table, used as a `hash → expires_at` dictionary. It is not an in-memory dict or a local JSON file:
   - an in-memory dict exists per gunicorn worker and is lost on restart
   - a JSON file has write races between workers and exists only on one container
@@ -221,9 +222,9 @@ Unknown version (for example `/api/v2/...`) → 404.
 - **Flow** (`IdempotencyService`):
   1. Delete an expired record with the same key.
   2. Insert `key` with `expires_at = now + TTL`, in its own short transaction.
-     - If the insert hits the unique key, the hash already exists and has not expired → **409** `"Duplicate booking request. The same booking was already submitted."`. The view does not run.
-  3. Run the view.
-     - 2xx → keep the hash until it expires, and link it to the created appointment (`appointment_id` = the `id` in the 201 body).
+     - If the insert hits the unique key, the hash already exists and has not expired → the decorator raises `ConflictError` → **409** Problem Details `"Duplicate booking request. The same booking was already submitted."`. The handler does not run.
+  3. Run the handler.
+     - 2xx → keep the hash until it expires, and link it to the created appointment (`appointment_id` = `response.data["id"]`).
      - non-2xx, or an exception → delete the hash, so a corrected retry runs normally.
 - **TTL:** `IDEMPOTENCY_TTL_SECONDS` (default 600). PostgreSQL has no native row TTL, so expired rows are cleaned in three ways:
   1. **On the same key:** before the insert, an expired row with the same hash is deleted. Because of this, an expired hash never blocks a booking, and cleanup is only about table size, not correctness.
@@ -234,7 +235,7 @@ Unknown version (for example `/api/v2/...`) → 404.
      - No cron, extra container or extension is needed.
   3. **Manual / cron:** `manage.py purge_idempotency_keys` does a bulk delete on demand.
 - **Relation to the overlap check:** the overlap check still protects the data. The two checks answer different cases:
-  - Same user + same payload within the TTL → 409 duplicate request, from the middleware.
+  - Same user + same payload within the TTL → 409 duplicate request, from the `@idempotent` decorator.
   - A different payload or a different user for a taken slot → 409 slot taken, from the overlap check.
 - **Known limitation:** a duplicate gets a 409, not the original 201. A client that lost the first response (for example, a timeout) checks `GET /appointments` to confirm the booking. Future improvement for payments: store the first response and replay it.
 

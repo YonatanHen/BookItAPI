@@ -89,6 +89,9 @@ SIMPLE_JWT = {
     "SIGNING_KEY": SECRET_KEY,
 }
 
+IDEMPOTENCY_TTL_SECONDS = int(env("IDEMPOTENCY_TTL_SECONDS", "600"))
+IDEMPOTENCY_PURGE_INTERVAL_SECONDS = int(env("IDEMPOTENCY_PURGE_INTERVAL_SECONDS", "300"))
+
 # Only the seed command needs it; the command fails with a clear message when it is empty.
 SEED_USER_PASSWORD = os.environ.get("SEED_USER_PASSWORD", "")
 
