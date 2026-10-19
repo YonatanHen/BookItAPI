@@ -20,6 +20,7 @@ def test_valid_register_request_parses_role_enum():
         ({"password": "12345678901"}, "password"),
         ({"role": "Admin"}, "role"),
         ({"full_name": "   "}, "full_name"),
+        ({"full_name": "A\x00B"}, "full_name"),
         ({"is_staff": True}, "is_staff"),
     ],
 )
