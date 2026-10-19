@@ -21,7 +21,12 @@ docker compose up --build       # api + db (Postgres) + redis; the api migrates 
 ## Local development (without the api container)
 
 1. Create the environment file: `python scripts/init_env.py`. Secrets are never in code; `.env` is gitignored.
-2. Start only the database: `docker compose up -d db`.
+2. Start only the database: `docker compose up -d db`. Or use the plain Docker command from the brief; it matches the default `.env` values:
+   ```bash
+   docker run --name bookit-db -e POSTGRES_PASSWORD=bookit -e POSTGRES_DB=bookit \
+     -p 5432:5432 -d postgres:16
+   ```
+   Both publish port 5432, so run only one of them.
 3. Install and run:
    ```bash
    python -m venv .venv
